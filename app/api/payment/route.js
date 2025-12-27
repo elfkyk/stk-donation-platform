@@ -16,8 +16,8 @@ export async function POST(request) {
     const emailToSave = userEmail || 'misafir@kullanici.com';
 
     // 2. E-postayı 'callbackUrl' içine gizliyoruz ki dönüşte geri alalım
-    // Örn: .../callback?email=elifkyk@gmail.com
-    const callbackWithEmail = `http://localhost:3000/api/payment/callback?email=${encodeURIComponent(emailToSave)}`;
+    // DİKKAT: Burası artık senin canlı site adresin oldu! 👇
+    const callbackWithEmail = `https://stk-donation-platform.vercel.app/api/payment/callback?email=${encodeURIComponent(emailToSave)}`;
 
     const requestData = {
       locale: Iyzipay.LOCALE.TR,
