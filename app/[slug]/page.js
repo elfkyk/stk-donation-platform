@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, use } from 'react'; // 'use' eklendi
+import { useEffect, useState, use } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
+// useRouter satırını sildik çünkü kullanmıyoruz, uyarı ondan çıkıyordu.
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -10,41 +10,43 @@ const supabase = createClient(
 );
 
 export default function CampaignDetail({ params }) {
-  // --- DÜZELTME BURADA ---
-  // Next.js 15'te params bir "Kutu" (Promise) olarak gelir. 
-  // İçindeki 'slug'ı almak için onu 'use' ile açıyoruz.
   const { slug } = use(params);
-  // -----------------------
 
   const [campaign, setCampaign] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState(null); 
-  const router = useRouter();
+  const [user, setUser] = useState(null);
+  
+  const [amount, setAmount] = useState(100); 
+  const [email, setEmail] = useState('');    
+  
+  // const router = useRouter(); <-- Bunu da sildik, gerek yok.
 
   useEffect(() => {
     async function getData() {
-      // 1. Kampanya verisini çek (Artık 'slug' değişkenini kullanıyoruz)
       const { data: campData } = await supabase
         .from('campaigns')
         .select('*')
-        .eq('slug', slug) 
+        .eq('slug', slug)
         .single();
       
       setCampaign(campData);
 
-      // 2. Giriş yapan kullanıcı var mı bak
       const { data: { user: userData } } = await supabase.auth.getUser();
       setUser(userData);
+
+      if (userData?.email) {
+        setEmail(userData.email);
+      }
     }
     
-    // slug geldiyse çalıştır
-    if (slug) {
-        getData();
-    }
-  }, [slug]); 
+    if (slug) { getData(); }
+  }, [slug]);
 
   const handlePayment = async () => {
     if(!campaign) return;
+    if(!email) { alert("Lütfen e-posta adresinizi giriniz."); return; }
+    if(amount <= 0) { alert("Lütfen geçerli bir tutar giriniz."); return; }
+
     setLoading(true);
 
     try {
@@ -52,18 +54,22 @@ export default function CampaignDetail({ params }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          price: 100, 
+          price: amount,
           campaignName: campaign.title,
-          userEmail: user ? user.email : null 
+          userEmail: email
         }),
       });
 
       const data = await response.json();
 
       if (data.status === 'success') {
-        window.location.href = data.paymentPageUrl; 
+        if (data.htmlContent) {
+            document.write(data.htmlContent);
+        } else if (data.paymentPageUrl) {
+            window.location.href = data.paymentPageUrl;
+        }
       } else {
-        alert('Ödeme başlatılamadı: ' + data.errorMessage);
+        alert('Ödeme hatası: ' + data.errorMessage);
       }
     } catch (err) {
       console.error(err);
@@ -96,31 +102,63 @@ export default function CampaignDetail({ params }) {
             {campaign.description}
           </p>
 
-          <div className="mt-10 p-6 bg-gray-50 rounded-xl border border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Bağış Tutarı</p>
-              <p className="text-3xl font-bold text-gray-900">100.00 ₺</p>
+          <div className="mt-10 p-8 bg-gray-50 rounded-xl border border-gray-200 shadow-sm">
+            
+            <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center">Destek Ol</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* 1. E-POSTA GİRİŞİ */}
+                <div>
+                    <label className="block text-gray-600 text-sm font-semibold mb-2">E-posta Adresiniz</label>
+                    <input
+                      type="email"
+                      placeholder="ornek@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none transition bg-white text-lg"
+                    />
+                </div>
+
+                {/* 2. TUTAR GİRİŞİ */}
+                <div>
+                    <label className="block text-gray-600 text-sm font-semibold mb-2">Bağış Tutarı</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="0"
+                        value={amount}
+                        onChange={(e) => setAmount(Number(e.target.value))}
+                        className="w-full p-4 border-2 border-gray-300 rounded-lg text-lg font-bold text-gray-800 focus:border-black outline-none transition"
+                      />
+                      <span className="absolute right-4 top-4 text-gray-500 font-bold">TL</span>
+                    </div>
+                </div>
             </div>
 
+            {/* 3. ÖDEME BUTONU */}
             <button
               onClick={handlePayment}
-              disabled={loading}
-              className="w-full sm:w-auto px-8 py-4 bg-black hover:bg-gray-800 text-white font-bold rounded-lg transition-all transform hover:scale-105 shadow-md disabled:opacity-50"
+              disabled={loading || amount <= 0}
+              className="w-full mt-6 py-4 bg-black hover:bg-gray-800 text-white font-bold text-xl rounded-xl shadow-lg transform transition hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'İşleniyor...' : `❤️ ${user ? 'Bağış Yap' : 'Misafir Olarak Bağış Yap'}`}
+              {loading ? 'İşleniyor...' : `❤️ ${amount > 0 ? amount + ' TL ' : ''}Bağış Yap`}
             </button>
-          </div>
-          
-          {user ? (
-            <p className="mt-4 text-sm text-green-600 text-center">
-              👤 <b>{user.email}</b> hesabıyla bağış yapıyorsunuz. Listede görünecek.
-            </p>
-          ) : (
-            <p className="mt-4 text-sm text-gray-400 text-center">
-              Giriş yapmadınız. Bağışınız &quot;Misafir&quot; olarak kaydedilecek.
-            </p>
-          )}
 
+            <div className="mt-4 text-center">
+                {user ? (
+                    <p className="text-sm text-green-600">
+                      ✅ <b>{user.email}</b> ile giriş yapıldı.
+                    </p>
+                ) : (
+                    <p className="text-xs text-gray-400">
+                      Misafir olarak bağış yapıyorsunuz.
+                    </p>
+                )}
+            </div>
+
+          </div>
         </div>
       </div>
     </div>
