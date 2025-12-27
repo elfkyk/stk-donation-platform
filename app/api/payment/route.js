@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Iyzipay from 'iyzipay';
+import 'postman-request';
 
 export async function POST(request) {
   try {
