@@ -1,10 +1,9 @@
-// import type { NextConfig } from "next"; <-- Bunu sildik veya yorum satırı yaptık
+// import type { NextConfig } from "next";
 
 const nextConfig = {
-  // 1. Iyzipay'i dış paket olarak işaretle
-  serverExternalPackages: ["iyzipay"],
+  // BURASI ÖNEMLİ: İkisini de listeye ekledik
+  serverExternalPackages: ["iyzipay", "postman-request"],
 
-  // 2. Dosyaları zorla dahil et
   experimental: {
     outputFileTracingIncludes: {
       '/api/payment': ['./node_modules/iyzipay/**/*']
