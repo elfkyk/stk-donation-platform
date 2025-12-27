@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import Iyzipay from 'iyzipay';
 import { createClient } from '@supabase/supabase-js';
+// Vercel'in paketi silmemesi için buraya da ekliyoruz
+import 'postman-request'; 
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -26,7 +28,8 @@ export async function POST(request) {
       iyzipay.checkoutForm.retrieve({ token: token }, async (err, result) => {
         
         if (err || result.status !== 'success' || result.paymentStatus !== 'SUCCESS') {
-           return resolve(NextResponse.redirect(new URL('/odeme-basarisiz', request.url)));
+            // HATA DURUMU İÇİN 303 EKLENDİ
+            return resolve(NextResponse.redirect(new URL('/odeme-basarisiz', request.url), { status: 303 }));
         }
 
         // 2. Veritabanına ARTIK GERÇEK EMAIL ile kaydediyoruz
@@ -37,10 +40,11 @@ export async function POST(request) {
             payment_id: result.paymentId,
             status: 'success',
             campaign_name: result.basketId,
-            donor_email: donorEmail // <-- İŞTE BURASI DÜZELDİ
+            donor_email: donorEmail 
           });
 
-        return resolve(NextResponse.redirect(new URL('/odeme-basarili', request.url)));
+        // BAŞARI DURUMU İÇİN 303 EKLENDİ (İşte Çözüm Burası! 🚀)
+        return resolve(NextResponse.redirect(new URL('/odeme-basarili', request.url), { status: 303 }));
       });
     });
 
