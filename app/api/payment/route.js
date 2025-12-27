@@ -3,21 +3,37 @@ import Iyzipay from 'iyzipay';
 
 export async function POST(request) {
   try {
-    // 1. Frontend'den gelen userEmail verisini alıyoruz
-    const { price, campaignName, userEmail } = await request.json();
+    console.log("➡️ 1. Ödeme isteği API'ye ulaştı.");
 
+    // Verileri almayı dene
+    const body = await request.json();
+    const { price, campaignName, userEmail } = body;
+    console.log("➡️ 2. Gelen veriler:", { price, campaignName, userEmail });
+
+    // Şifreleri kontrol et (Güvenlik için sadece var mı yok mu diye bakıyoruz)
+    const apiKey = process.env.IYZICO_API_KEY;
+    const secretKey = process.env.IYZICO_SECRET_KEY;
+
+    if (!apiKey || !secretKey) {
+        console.error("❌ HATA: API Key veya Secret Key okunamadı! .env ayarlarını kontrol et.");
+        return NextResponse.json({ error: 'Sunucu tarafında API anahtarları eksik.' }, { status: 500 });
+    }
+    console.log(`➡️ 3. Anahtarlar bulundu. API Key uzunluğu: ${apiKey.length}`);
+
+    // Iyzipay'i başlat
     const iyzipay = new Iyzipay({
-      apiKey: process.env.IYZICO_API_KEY,
-      secretKey: process.env.IYZICO_SECRET_KEY,
+      apiKey: apiKey,
+      secretKey: secretKey,
       uri: 'https://sandbox-api.iyzipay.com'
     });
+    console.log("➡️ 4. Iyzipay nesnesi oluşturuldu.");
 
-    // Email varsa onu kullan, yoksa 'misafir' olsun
+    // Kullanıcı email ve callback ayarı
     const emailToSave = userEmail || 'misafir@kullanici.com';
-
-    // 2. E-postayı 'callbackUrl' içine gizliyoruz ki dönüşte geri alalım
-    // DİKKAT: Burası artık senin canlı site adresin oldu! 👇
+    // BURAYA DİKKAT: Canlı site adresin olduğundan emin ol
     const callbackWithEmail = `https://stk-donation-platform.vercel.app/api/payment/callback?email=${encodeURIComponent(emailToSave)}`;
+    
+    console.log("➡️ 5. Iyzico'ya istek gönderiliyor... Callback:", callbackWithEmail);
 
     const requestData = {
       locale: Iyzipay.LOCALE.TR,
@@ -27,14 +43,14 @@ export async function POST(request) {
       currency: Iyzipay.CURRENCY.TRY,
       basketId: campaignName,
       paymentGroup: Iyzipay.PAYMENT_GROUP.PRODUCT,
-      callbackUrl: callbackWithEmail, // <-- GÜNCELLENDİ
+      callbackUrl: callbackWithEmail,
       enabledInstallments: [2, 3, 6, 9],
       buyer: {
         id: 'BY789',
         name: 'Hayırsever',
         surname: 'Vatandaş',
         gsmNumber: '+905350000000',
-        email: emailToSave, // <-- GÜNCELLENDİ
+        email: emailToSave,
         identityNumber: '74300864791',
         lastLoginDate: '2015-10-05 12:43:35',
         registrationAddress: 'Istanbul',
@@ -71,18 +87,21 @@ export async function POST(request) {
 
     return new Promise((resolve) => {
       iyzipay.checkoutFormInitialize.create(requestData, (err, result) => {
-        if (err || result.status !== 'success') {
-            resolve(NextResponse.json({ 
-                status: 'failure', 
-                errorMessage: result?.errorMessage 
-            }));
+        if (err) {
+            console.error("❌ IYZICO BAĞLANTI HATASI:", err);
+            resolve(NextResponse.json({ status: 'failure', errorMessage: 'Bağlantı hatası' }));
+        } else if (result.status !== 'success') {
+            console.error("❌ IYZICO İŞLEM HATASI:", result.errorMessage);
+            resolve(NextResponse.json({ status: 'failure', errorMessage: result.errorMessage }));
         } else {
+            console.log("✅ 6. Başarılı! Form token alındı.");
             resolve(NextResponse.json(result));
         }
       });
     });
 
   } catch (error) {
-    return NextResponse.json({ error: 'Sunucu hatası' }, { status: 500 });
+    console.error("🔥 KRİTİK HATA (CATCH):", error);
+    return NextResponse.json({ error: error.message || 'Sunucu hatası' }, { status: 500 });
   }
 }
